@@ -15,7 +15,7 @@ from flask import Flask, request, g, redirect, url_for, render_template
 from bs4 import BeautifulSoup
 
 DB_PATH = 'oposiciones.db'
-app = Flask(__name__)  # Cambiar nombre
+app = Flask(__name__)
 
 # --------------------
 # Database helpers
@@ -141,41 +141,28 @@ def scrape_boe():
 
 @app.route('/')
 def index():
-    """Muestra la tabla de oposiciones, con búsqueda y filtro."""
+    """Muestra los departamentos como tarjetas."""
     init_db()
     db = get_db()
-
-    q = request.args.get('q', '').strip()
-    departamento = request.args.get('departamento', '').strip()
-
-    params = []
-    where = []
-    sql = 'SELECT * FROM oposiciones'
-
-    if q:
-        likeq = f'%{q}%'
-        where.append(
-            "(identificador LIKE ? OR control LIKE ? OR titulo LIKE ?)")
-        params.extend([likeq, likeq, likeq])
-
-    if departamento:
-        where.append("departamento = ?")
-        params.append(departamento)
-
-    if where:
-        sql += ' WHERE ' + ' AND '.join(where)
-
-    sql += ' ORDER BY id DESC'
-
-    cur = db.execute(sql, params)
-    rows = cur.fetchall()
-
-    # Obtener lista de departamentos para el filtro
     deps = db.execute(
         'SELECT DISTINCT departamento FROM oposiciones WHERE departamento IS NOT NULL ORDER BY departamento'
     ).fetchall()
+    return render_template('index.html', departamentos=deps)
 
-    return render_template('index.html', rows=rows, q=q, departamento=departamento, departamentos=deps)
+
+@app.route('/departamento/<nombre>')
+def mostrar_departamento(nombre):
+    """Muestra las oposiciones del departamento seleccionado"""
+    init_db()
+    db = get_db()
+
+    cur = db.execute(
+        'SELECT * FROM oposiciones WHERE departamento = ? ORDER BY id DESC',
+        (nombre,)
+    )
+    rows = cur.fetchall()
+
+    return render_template('tarjeta.html', departamento=nombre, rows=rows)
 
 
 @app.route('/scrape')
