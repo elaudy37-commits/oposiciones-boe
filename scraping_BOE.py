@@ -1,10 +1,18 @@
 """scraping_boe.py
 
-Aplicación Flask que:
-- Raspa oposiciones del BOE usando requests + BeautifulSoup
-- Guarda resultados en SQLite
-- Muestra tabla con Bootstrap en plantilla externa (/templates/index.html)
-- Permite búsqueda por texto y filtrado
+Aplicación Flask para Web Scraping del BOE (Boletín Oficial del Estado)
+
+Funcionalidades principales:
+- Extrae oposiciones y concursos de la API oficial del BOE
+- Almacena datos en base de datos SQLite local
+- Interfaz web responsive con Bootstrap 5
+- Organización por departamentos en vista de tarjetas
+- Enlaces directos a documentos PDF oficiales
+- Sistema de actualización manual de datos
+
+Autor: Desarrollado por franSM, Cristóbal Delgado Romero.
+Versión: 1.0
+Fecha: 2025
 """
 
 import sqlite3
@@ -18,12 +26,44 @@ DB_PATH = 'oposiciones.db'
 app = Flask(__name__)
 
 # --------------------
+# Jinja2 filters
+# --------------------
+
+@app.template_filter('format_date')
+def format_date_filter(date_str):
+    """Convierte fecha de formato YYYYMMDD a dd/mm/yyyy.
+    
+    Args:
+        date_str (str): Fecha en formato YYYYMMDD (ej: '20251017')
+        
+    Returns:
+        str: Fecha en formato dd/mm/yyyy (ej: '17/10/2025')
+    """
+    if not date_str or len(date_str) != 8:
+        return date_str
+    try:
+        # Parsear YYYYMMDD
+        year = date_str[0:4]
+        month = date_str[4:6]
+        day = date_str[6:8]
+        return f"{day}/{month}/{year}"
+    except:
+        return date_str
+
+# --------------------
 # Database helpers
 # --------------------
 
 
 def get_db():
-    """Devuelve la conexión a la base de datos SQLite."""
+    """Obtiene conexión a la base de datos SQLite.
+    
+    Utiliza el patrón de Flask g para mantener una conexión por request.
+    Configura row_factory para acceso por nombre de columna.
+    
+    Returns:
+        sqlite3.Connection: Conexión a la base de datos con row_factory configurado
+    """
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DB_PATH)
@@ -40,7 +80,18 @@ def close_connection(_):
 
 
 def init_db():
-    """Inicializa la tabla de oposiciones si no existe."""
+    """Inicializa la estructura de base de datos.
+    
+    Crea la tabla 'oposiciones' con los siguientes campos:
+    - id: Clave primaria autoincremental
+    - identificador: ID único del BOE
+    - control: Número de control
+    - titulo: Título de la convocatoria
+    - url_html: URL del documento HTML
+    - url_pdf: URL del documento PDF (UNIQUE para evitar duplicados)
+    - departamento: Entidad convocante
+    - fecha: Fecha de publicación
+    """
     db = get_db()
     db.execute('''
         CREATE TABLE IF NOT EXISTS oposiciones (
@@ -62,7 +113,22 @@ def init_db():
 # --------------------
 
 def scrape_boe():
-    """"Raspa TODAS las oposiciones del BOE y las guarda en SQLite"""
+    """Extrae oposiciones del BOE y las almacena en SQLite.
+    
+    Proceso:
+    1. Conecta a la API oficial del BOE con fecha actual
+    2. Si no hay datos, retrocede hasta 7 días buscando información
+    3. Parsea XML de la sección 2B (Oposiciones y Concursos)
+    4. Extrae datos: identificador, título, control, URLs, departamento
+    5. Guarda en base de datos evitando duplicados
+    
+    Returns:
+        int: Número de registros nuevos insertados
+        
+    Raises:
+        requests.RequestException: Error de conexión a la API
+        sqlite3.Error: Error de base de datos
+    """
     init_db()
     db = get_db()
     collected = 0
@@ -71,9 +137,9 @@ def scrape_boe():
     fecha = datetime.today()
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/118.0.5993.118 Safari/537.3',
+        'Chrome/118.0.5993.118 Safari/537.36',
         'Accept': 'application/xml, text/xml, */*; q=0.01',
     }
 
@@ -84,15 +150,15 @@ def scrape_boe():
         try:
             r = requests.get(boe_url, headers=headers, timeout=10)
             if r.status_code == 200:
-                print(f"✅ BOE encontrado {boe_url}")
+                print(f" BOE encontrado {boe_url}")
                 break
-            print(f"❌ No disponible para {hoy}. Probando día anterior.")
+            print(f" No disponible para {hoy}. Probando día anterior.")
         except requests.RequestException as e:
-            print(f"❌ Error al obtener {boe_url}: {e}")
+            print(f" Error al obtener {boe_url}: {e}")
 
         fecha -= timedelta(days=1)  # Retroceder un día si falla.
     else:
-        print("❌ No se encontró ningún BOE reciente.")
+        print(" No se encontró ningún BOE reciente.")
         return 0
 
     soup = BeautifulSoup(r.content, 'xml')
@@ -141,7 +207,14 @@ def scrape_boe():
 
 @app.route('/')
 def index():
-    """Muestra los departamentos como tarjetas."""
+    """Página principal - Lista de departamentos disponibles.
+    
+    Consulta todos los departamentos únicos que tienen oposiciones
+    registradas y los muestra en formato de tarjetas.
+    
+    Returns:
+        str: HTML renderizado con la lista de departamentos
+    """
     init_db()
     db = get_db()
     deps = db.execute(
@@ -152,7 +225,14 @@ def index():
 
 @app.route('/departamento/<nombre>')
 def mostrar_departamento(nombre):
-    """Muestra las oposiciones del departamento seleccionado"""
+    """Vista detallada de oposiciones por departamento.
+    
+    Args:
+        nombre (str): Nombre del departamento a consultar
+        
+    Returns:
+        str: HTML renderizado con tabla de oposiciones del departamento
+    """
     init_db()
     db = get_db()
 
@@ -167,7 +247,14 @@ def mostrar_departamento(nombre):
 
 @app.route('/scrape')
 def do_scrape():
-    """Ejecuta el scraper y redirige a la página principal."""
+    """Endpoint para actualizar datos del BOE.
+    
+    Ejecuta el proceso de web scraping para obtener las últimas
+    oposiciones publicadas en el BOE y las almacena en la base de datos.
+    
+    Devuelve:
+        werkzeug.wrappers.Response: Redirección a la página principal
+    """
     init_db()
     scrape_boe()
     return redirect(url_for('index'))

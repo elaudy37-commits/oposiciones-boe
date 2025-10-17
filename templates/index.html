@@ -1,3 +1,10 @@
+<!--
+    Plantilla principal - Lista de departamentos
+    
+    Muestra todos los departamentos disponibles en formato de tarjetas.
+    Cada tarjeta enlaza a la vista detallada del departamento.
+    Incluye botón para actualizar datos del BOE.
+-->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -10,18 +17,23 @@
 </head>
 
 <body class="bg-light">
-    <!-- Navbar -->
+    <!-- Barra de navegación principal -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
             <a class="navbar-brand" href="/">📜 Oposiciones BOE</a>
         </div>
     </nav>
-    <!-- Titulo -->
+    <!-- Título principal de la aplicación -->
     <h1 id="titulo" class="text-center mb-4">Oposiciones BOE</h1>
 
-    <!-- Tabla de tarjetas-->
+    <!-- Contenedor principal con tarjetas de departamentos -->
     <div class="container py-5">
-        <h2 class="text-center mb-4">Departamentos</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Departamentos</h2>
+            <a href="{{ url_for('do_scrape') }}" class="btn btn-primary">
+                 Actualizar datos BOE
+            </a>
+        </div>
         <div class="row g-4">
             {% for dep in departamentos %}
             <div class="col-md-4 col-lg-3">
@@ -30,8 +42,8 @@
                     <div class="card h-100 shadow-sm">
                         <img src="{{ url_for('static', filename='img/' + dep['departamento']|replace(' ', '_') + '.jpg') }}"
                             class="card-img-top" alt="{{ dep['departamento'] }}"
-                            onerror="this.src='{{ url_for('static', filename='img/default.jpg') }}'">
-                        <div>
+                            onerror="this.src='{{ url_for('static', filename='img/default.svg') }}'">
+                        <div class="card-body">
                             <h5 class="card-title">{{ dep['departamento'] }}</h5>
                         </div>
                     </div>

@@ -1,3 +1,10 @@
+<!--
+    Plantilla de departamento - Vista detallada
+    
+    Muestra todas las oposiciones de un departamento específico
+    en formato de tabla con enlaces a los PDFs oficiales.
+    Incluye botón de retorno a la página principal.
+-->
 <!DOCTYPE html>
 <html lang="es">
 
@@ -10,7 +17,7 @@
 </head>
 
 <body class="bg-light">
-    <!-- Navbar -->
+    <!-- Barra de navegación (consistente con index.html) -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div class="container">
             <a class="navbar-brand" href="/">📜 Oposiciones BOE</a>
@@ -38,11 +45,11 @@
                         <td>{{ row['identificador'] }}</td>
                         <td>{{ row['titulo'] }}</td>
                         <td>{{ row['control'] }}</td>
-                        <td><a href="{{ row['url_for'] }}" target="_blank" class="btn btn-sm btn-primary">Ver PDF</a>
+                        <td><a href="{{ row['url_pdf'] }}" target="_blank" class="btn btn-sm btn-primary">Ver PDF</a>
                         </td>
-                        <td>{{ row['fecha'] }}</td>
+                        <td>{{ row['fecha']|format_date }}</td>
                     </tr>
-                    { % else %}
+                    {% else %}
                     <tr>
                         <td colspan="5" class="text-center">No hay oposiciones registradas para este departamento.</td>
                     </tr>
