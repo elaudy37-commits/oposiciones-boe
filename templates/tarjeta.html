@@ -109,6 +109,40 @@ Incluye botón de retorno a la página principal y paginación.
         </nav>
         {% endif %}
     </div>
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-3">{{ departamento }}</h2>
+<div class="list-group mb-3">
+  {% for r in rows %}
+    <a class="list-group-item list-group-item-action" href="{{ r['url_html'] }}" target="_blank">
+      <div class="d-flex w-100 justify-content-between">
+        <h5 class="mb-1">{{ r['titulo'] }}</h5>
+        <small>{{ r['fecha']|format_date }}</small>
+      </div>
+      <p class="mb-1">{{ r['identificador'] }} · {{ r['control'] }}</p>
+      {% if r['url_pdf'] %}
+        <small>PDF: {{ r['url_pdf'] }}</small>
+      {% endif %}
+    </a>
+  {% endfor %}
+</div>
+
+<nav aria-label="Paginación">
+  <ul class="pagination">
+    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('mostrar_departamento', nombre=departamento, page=page-1) }}">Anterior</a>
+    </li>
+    {% for p in range(1, total_pages+1) %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('mostrar_departamento', nombre=departamento, page=p) }}">{{ p }}</a>
+      </li>
+    {% endfor %}
+    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+      <a class="page-link" href="{{ url_for('mostrar_departamento', nombre=departamento, page=page+1) }}">Siguiente</a>
+    </li>
+  </ul>
+</nav>
+{% endblock %}
 
 </body>
 
