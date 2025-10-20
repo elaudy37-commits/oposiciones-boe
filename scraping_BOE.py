@@ -197,7 +197,7 @@ def scrape_boe():
             db.commit()
             collected += 1
         except sqlite3.IntegrityError:
-            continue  # URL ya existe
+            continue  
 
     return collected
 # --------------------
@@ -225,24 +225,39 @@ def index():
 
 @app.route('/departamento/<nombre>')
 def mostrar_departamento(nombre):
-    """Vista detallada de oposiciones por departamento.
-    
-    Args:
-        nombre (str): Nombre del departamento a consultar
-        
-    Returns:
-        str: HTML renderizado con tabla de oposiciones del departamento
-    """
+    """Vista detallada de oposiciones por departamento con paginación."""
     init_db()
     db = get_db()
 
-    cur = db.execute(
-        'SELECT * FROM oposiciones WHERE departamento = ? ORDER BY id DESC',
+    # Parámetro 'page' en la URL (por defecto = 1)
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    offset = (page - 1) * per_page
+
+    # Total de registros
+    total = db.execute(
+        'SELECT COUNT(*) FROM oposiciones WHERE departamento = ?',
         (nombre,)
+    ).fetchone()[0]
+
+    # Paginación: solo 15 registros
+    cur = db.execute(
+        'SELECT * FROM oposiciones WHERE departamento = ? ORDER BY fecha DESC, id DESC LIMIT ? OFFSET ?',
+        (nombre, per_page, offset)
     )
     rows = cur.fetchall()
 
-    return render_template('tarjeta.html', departamento=nombre, rows=rows)
+    # Calcular número total de páginas
+    total_pages = (total + per_page - 1) // per_page  # redondeo hacia arriba
+
+    return render_template(
+        'tarjeta.html',
+        departamento=nombre,
+        rows=rows,
+        page=page,
+        total_pages=total_pages
+    )
+
 
 
 @app.route('/scrape')
