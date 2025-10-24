@@ -13,15 +13,20 @@ import sqlite3
 from datetime import datetime, timedelta
 
 import requests
+<<<<<<< HEAD
 from flask import (
     Flask, request, g, redirect, url_for, render_template, session, flash
 )
+=======
+from flask import Flask, request, g, redirect, url_for, render_template, flash
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 from bs4 import BeautifulSoup
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 
 DB_PATH = 'oposiciones.db'
 app = Flask(__name__)
+app.secret_key = 'clave-secreta-para-flask-sessions-cambiar-en-produccion'
 
 # === Configuración básica (lee de variables de entorno) ===
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cambia-esto')
@@ -36,7 +41,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', os.getenv('
 mail = Mail(app)
 
 # --------------------
-# Jinja2 filters
+# filtros Jinja2 
 # --------------------
 
 @app.template_filter('format_date')
@@ -52,7 +57,11 @@ def format_date_filter(date_str):
         return date_str
 
 # --------------------
+<<<<<<< HEAD
 # Helpers DB
+=======
+# Ayudas con la bases de datos
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 # --------------------
 
 def get_db():
@@ -68,11 +77,64 @@ def close_connection(_):
     if db is not None:
         db.close()
 
+<<<<<<< HEAD
 def init_db():
+=======
+
+def extraer_provincia(texto):
+    """Extrae el nombre de la provincia del texto usando palabras clave.
+    
+    Args:
+        texto (str): Texto donde buscar la provincia (título, control, etc.)
+        
+    Returns:
+        str: Nombre de la provincia encontrada o None
+    """
+    if not texto:
+        return None
+    
+    # Lista de provincias españolas
+    provincias = [
+        'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
+        'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
+        'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Girona', 'Granada',
+        'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Jaén', 'La Coruña',
+        'La Rioja', 'Las Palmas', 'León', 'Lérida', 'Lugo', 'Madrid',
+        'Málaga', 'Murcia', 'Navarra', 'Ourense', 'Palencia', 'Pontevedra',
+        'Salamanca', 'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Teruel',
+        'Toledo', 'Valencia', 'Valladolid', 'Vizcaya', 'Zamora', 'Zaragoza',
+        'Ceuta', 'Melilla'
+    ]
+    
+    texto_upper = texto.upper()
+    
+    for provincia in provincias:
+        if provincia.upper() in texto_upper:
+            return provincia
+    
+    return None
+
+
+def init_db():
+    """Inicializa la estructura de base de datos.
+    
+    Crea la tabla 'oposiciones' con los siguientes campos:
+    - id: Clave primaria autoincremental
+    - identificador: ID único del BOE
+    - control: Número de control
+    - titulo: Título de la convocatoria
+    - url_html: URL del documento HTML
+    - url_pdf: URL del documento PDF (UNIQUE para evitar duplicados)
+    - departamento: Entidad convocante
+    - fecha: Fecha de publicación
+    - provincia: Provincia extraída del título/control
+    """
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
     db = get_db()
     # Tabla oposiciones
     db.execute("""
         CREATE TABLE IF NOT EXISTS oposiciones (
+<<<<<<< HEAD
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             identificador TEXT NOT NULL,
             control TEXT,
@@ -92,6 +154,40 @@ def init_db():
             created_at TEXT NOT NULL
         )
     """)
+=======
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               identificador TEXT NOT NULL,
+               control TEXT,
+               titulo TEXT,
+               url_html TEXT UNIQUE,
+               url_pdf TEXT,
+               departamento TEXT,
+               fecha TEXT,
+               provincia TEXT
+        )
+    ''')
+    
+    # Migración: Añadir columna provincia si no existe
+    try:
+        db.execute('SELECT provincia FROM oposiciones LIMIT 1')
+    except sqlite3.OperationalError:
+        # La columna no existe, añadirla
+        print("Añadiendo columna 'provincia' a la base de datos...")
+        db.execute('ALTER TABLE oposiciones ADD COLUMN provincia TEXT')
+        
+        # Actualizar registros existentes con provincia extraída
+        cursor = db.execute('SELECT id, titulo, control FROM oposiciones')
+        rows = cursor.fetchall()
+        for row in rows:
+            provincia = extraer_provincia(row['titulo']) or extraer_provincia(row['control'])
+            if provincia:
+                db.execute('UPDATE oposiciones SET provincia = ? WHERE id = ?', (provincia, row['id']))
+        print(f"Actualizado {len(rows)} registros con información de provincia.")
+    
+             #   fecha  TEXT
+# )
+    ''')
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
     db.commit()
 
 # --------------------
@@ -173,6 +269,7 @@ def all_user_emails():
 # --------------------
 
 def scrape_boe():
+<<<<<<< HEAD
     """
     Devuelve una lista de dicts con las oposiciones NUEVAS insertadas.
     """
@@ -181,23 +278,66 @@ def scrape_boe():
 <<<<<<< HEAD
     newly_inserted = []
 =======
+=======
+    """Extrae oposiciones del BOE y las almacena en SQLite.
+    
+    Proceso:
+    1. Conecta a la API oficial del BOE con fecha actual
+    2. Si no hay datos, retrocede hasta 7 días buscando información
+    3. Parsea XML de la sección 2B (Oposiciones y Concursos)
+    4. Extrae datos: identificador, título, control, URLs, departamento
+    5. Guarda en base de datos evitando duplicados
+    
+    Returns:
+        tuple: (éxito: bool, mensaje: str, registros_nuevos: int)
+        
+    Raises:
+        Exception: Captura y retorna cualquier error que ocurra
+    """
+    try:
+        init_db()
+        db = get_db()
+        collected = 0
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 
-     # eliminar registros antiguos
-    db.execute("DELETE FROM oposiciones")
-    db.commit()
+        # Construir URL con la fecha actual
+        fecha = datetime.today()
 
+<<<<<<< HEAD
     collected = 0
 >>>>>>> origin/Demo-branch
 
     fecha = datetime.today()
+=======
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/118.0.5993.118 Safari/537.36',
+            'Accept': 'application/xml, text/xml, */*; q=0.01',
+        }
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/118.0.5993.118 Safari/537.36',
-        'Accept': 'application/xml, text/xml, */*; q=0.01',
-    }
+        # Buscar hasta encontrar resultado en BOE si da error hasta 7 días atrás.
+        r = None
+        for _ in range(7):
+            hoy = fecha.strftime('%Y%m%d')
+            boe_url = f'https://www.boe.es/datosabiertos/api/boe/sumario/{hoy}'
+            try:
+                r = requests.get(boe_url, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    print(f" BOE encontrado {boe_url}")
+                    break
+                print(f" No disponible para {hoy}. Probando día anterior.")
+            except requests.RequestException as e:
+                print(f" Error al obtener {boe_url}: {e}")
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 
+            fecha -= timedelta(days=1)  # Retroceder un día si falla.
+        else:
+            mensaje = "No se encontró ningún BOE reciente en los últimos 7 días."
+            print(f" {mensaje}")
+            return (False, mensaje, 0)
+
+<<<<<<< HEAD
     for _ in range(7):
         hoy = fecha.strftime('%Y%m%d')
         boe_url = f'https://www.boe.es/datosabiertos/api/boe/sumario/{hoy}'
@@ -215,22 +355,63 @@ def scrape_boe():
     seccion = soup.find("seccion", {"codigo": "2B"})
     if not seccion:
         return []
+=======
+        if not r or r.status_code != 200:
+            return (False, "No se pudo conectar con el BOE.", 0)
 
-    items = seccion.find_all("item")
+        # Parsear XML con lxml
+        try:
+            soup = BeautifulSoup(r.content, 'lxml-xml')
+        except Exception as e:
+            # Intentar con html.parser como fallback
+            try:
+                soup = BeautifulSoup(r.content, 'html.parser')
+                print("Advertencia: usando html.parser en lugar de lxml")
+            except Exception as e2:
+                return (False, f"Error al parsear XML: {str(e)}. SOLUCIÓN: 1) Cierra Flask (Ctrl+C), 2) Ejecuta 'pip install lxml', 3) Reinicia Flask con 'python scraping_BOE.py'", 0)
 
-    for item in items:
-        identificador_tag = item.find("identificador")
-        control_tag = item.find("control")
-        titulo_tag = item.find("titulo")
-        url_html_tag = item.find("url_html")
-        url_pdf_tag = item.find("url_pdf")
+        # Buscar las entradas de tipo <item>
+        seccion = soup.find("seccion", {"codigo": "2B"})
+        if not seccion:
+            mensaje = "No se encontró la sección 2B (Oposiciones y Concursos) en el BOE."
+            print(mensaje)
+            return (True, mensaje, 0)
 
-        identificador = identificador_tag.text.strip() if identificador_tag else None
-        control = control_tag.text.strip() if control_tag else None
-        titulo = titulo_tag.text.strip() if titulo_tag else None
-        url_html = url_html_tag.text.strip() if url_html_tag else None
-        url_pdf = url_pdf_tag.text.strip() if url_pdf_tag else None
+        items = seccion.find_all("item")
 
+        for item in items:
+            identificador_tag = item.find("identificador")
+            control_tag = item.find("control")
+            titulo_tag = item.find("titulo")
+            url_html_tag = item.find("url_html")
+            url_pdf_tag = item.find("url_pdf")
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
+
+            identificador = identificador_tag.text.strip() if identificador_tag else None
+            control = control_tag.text.strip() if control_tag else None
+            titulo = titulo_tag.text.strip() if titulo_tag else None
+            url_html = url_html_tag.text.strip() if url_html_tag else None
+            url_pdf = url_pdf_tag.text.strip() if url_pdf_tag else None
+
+            # Buscar el departamento padre
+            dept_parent = item.find_parent("departamento")
+            departamento = dept_parent.get(
+                'nombre') if dept_parent and dept_parent.has_attr('nombre') else None
+            
+            # Extraer provincia del título o control
+            provincia = extraer_provincia(titulo) or extraer_provincia(control)
+
+            try:
+                db.execute('''
+                    INSERT INTO oposiciones (identificador, control, titulo, url_html, url_pdf, departamento, fecha, provincia)
+                    VALUES ( ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (identificador, control, titulo, url_html, url_pdf, departamento, hoy, provincia))
+                db.commit()
+                collected += 1
+            except sqlite3.IntegrityError:
+                continue  # URL ya existe
+
+<<<<<<< HEAD
         dept_parent = item.find_parent("departamento")
         departamento = dept_parent.get('nombre') if dept_parent and dept_parent.has_attr('nombre') else None
 
@@ -254,6 +435,22 @@ def scrape_boe():
             continue
 
     return newly_inserted
+=======
+        if collected > 0:
+            return (True, f"Se han añadido {collected} nuevas oposiciones.", collected)
+        else:
+            return (True, "No se encontraron nuevas oposiciones (todas ya estaban en la base de datos).", 0)
+            
+    except Exception as e:
+        mensaje_error = f"Error inesperado: {str(e)}"
+        print(f" {mensaje_error}")
+        import traceback
+        traceback.print_exc()
+        return (False, mensaje_error, 0)
+# --------------------
+# Flask routes
+# --------------------
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 
 # --------------------
 # Rutas Flask
@@ -270,6 +467,7 @@ def index():
 
 @app.route('/departamento/<nombre>')
 def mostrar_departamento(nombre):
+<<<<<<< HEAD
     init_db()
     db = get_db()
 
@@ -289,6 +487,65 @@ def mostrar_departamento(nombre):
     rows = cur.fetchall()
 
     total_pages = (total + per_page - 1) // per_page
+=======
+    
+    init_db()
+    db = get_db()
+    
+    # Obtener parámetros de filtro de la URL
+    texto_busqueda = request.args.get('busqueda', '').strip()
+    provincia_filtro = request.args.get('provincia', '').strip()
+    fecha_desde = request.args.get('fecha_desde', '').strip()
+    fecha_hasta = request.args.get('fecha_hasta', '').strip()
+    
+    # Obtener lista de provincias disponibles para este departamento
+    provincias_disponibles = db.execute(
+        'SELECT DISTINCT provincia FROM oposiciones WHERE departamento = ? AND provincia IS NOT NULL ORDER BY provincia',
+        [nombre]
+    ).fetchall()
+    
+    # Construir consulta SQL dinámica
+    query = 'SELECT * FROM oposiciones WHERE departamento = ?'
+    params = [nombre]
+    
+    # Filtro por texto (busca en identificador, título, control y provincia)
+    if texto_busqueda:
+        query += ' AND (identificador LIKE ? OR titulo LIKE ? OR control LIKE ? OR provincia LIKE ?)'
+        busqueda_param = f'%{texto_busqueda}%'
+        params.extend([busqueda_param, busqueda_param, busqueda_param, busqueda_param])
+    
+    # Filtro por provincia específica
+    if provincia_filtro:
+        query += ' AND provincia = ?'
+        params.append(provincia_filtro)
+    
+    # Filtro por fecha desde (convertir YYYY-MM-DD a YYYYMMDD)
+    if fecha_desde:
+        fecha_desde_formateada = fecha_desde.replace('-', '')
+        query += ' AND fecha >= ?'
+        params.append(fecha_desde_formateada)
+    
+    # Filtro por fecha hasta (convertir YYYY-MM-DD a YYYYMMDD)
+    if fecha_hasta:
+        fecha_hasta_formateada = fecha_hasta.replace('-', '')
+        query += ' AND fecha <= ?'
+        params.append(fecha_hasta_formateada)
+    
+    query += ' ORDER BY id DESC'
+    
+    # Ejecutar consulta con filtros
+    cur = db.execute(query, params)
+    rows = cur.fetchall()
+
+    return render_template('tarjeta.html', 
+                         departamento=nombre, 
+                         rows=rows,
+                         busqueda=texto_busqueda,
+                         provincia_filtro=provincia_filtro,
+                         provincias=provincias_disponibles,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
 
     return render_template(
         'tarjeta.html',
@@ -302,6 +559,7 @@ def mostrar_departamento(nombre):
 @app.route('/scrape')
 def do_scrape():
     init_db()
+<<<<<<< HEAD
     new_items = scrape_boe()
     if new_items:
         recipients = all_user_emails()
@@ -312,6 +570,15 @@ def do_scrape():
             flash(f"Se insertaron {len(new_items)} nuevas oposiciones, pero falló el envío de email: {e}", "warning")
     else:
         flash("No hay nuevas oposiciones hoy.", "info")
+=======
+    exito, mensaje, registros = scrape_boe()
+    
+    if exito:
+        flash(mensaje, 'success')
+    else:
+        flash(mensaje, 'danger')
+    
+>>>>>>> 29ca368eeda45687fb7db43040ee36e1a86bc1ae
     return redirect(url_for('index'))
 
 # --- Registro / Login ---
