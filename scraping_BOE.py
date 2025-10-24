@@ -308,20 +308,7 @@ def index():
 
 @app.route('/departamento/<nombre>')
 def mostrar_departamento(nombre):
-    """Vista detallada de oposiciones por departamento con filtros.
     
-    Args:
-        nombre (str): Nombre del departamento a consultar
-        
-    Query Parameters:
-        busqueda (str): Texto para buscar en identificador, título, control o provincia
-        provincia (str): Filtrar por provincia específica
-        fecha_desde (str): Fecha desde en formato YYYY-MM-DD
-        fecha_hasta (str): Fecha hasta en formato YYYY-MM-DD
-        
-    Returns:
-        str: HTML renderizado con tabla de oposiciones del departamento filtradas
-    """
     init_db()
     db = get_db()
     
