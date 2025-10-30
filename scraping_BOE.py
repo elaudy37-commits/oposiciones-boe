@@ -52,6 +52,22 @@ def format_date_filter(date_str):
         return f"{day}/{month}/{year}"
     except Exception:
         return date_str
+    
+from datetime import datetime, date
+
+# 🟡 Filtro Jinja: marca como recientes las oposiciones de los últimos x días
+@app.template_filter('es_reciente')
+def es_reciente(fecha_str, dias=0):
+    """
+    Devuelve True si la fecha de la oposición está dentro de los últimos `dias`.
+    Usa formato 'YYYYMMDD' del BOE.
+    """
+    try:
+        f = datetime.strptime(fecha_str, "%Y%m%d").date()
+        return (date.today() - f).days <= dias
+    except Exception:
+        return False
+
 
 # --------------------
 # Helpers DB
@@ -320,71 +336,65 @@ def index():
 
 
 
-@app.route('/departamento/<nombre>')
+@app.route("/departamento/<nombre>")
 def mostrar_departamento(nombre):
-    init_db()
     db = get_db()
 
-    # Parámetros de filtrado
-    texto_busqueda = request.args.get('busqueda', '').strip()
-    provincia_filtro = request.args.get('provincia', '').strip()
-    fecha_desde = request.args.get('fecha_desde', '').strip()
-    fecha_hasta = request.args.get('fecha_hasta', '').strip()
-    page = request.args.get('page', 1, type=int)
-    per_page = 15
-    offset = (page - 1) * per_page
+    # 🔹 Fecha actual para marcar las oposiciones nuevas
+    hoy = datetime.today().strftime("%Y%m%d")
 
-    provincias_disponibles = db.execute(
-        'SELECT DISTINCT provincia FROM oposiciones WHERE departamento = ? AND provincia IS NOT NULL ORDER BY provincia',
-        [nombre]
-    ).fetchall()
+    busqueda = request.args.get("busqueda", "")
+    provincia = request.args.get("provincia", "")
+    fecha_desde = request.args.get("fecha_desde", "")
+    fecha_hasta = request.args.get("fecha_hasta", "")
+    page = int(request.args.get("page", 1))
+    por_pagina = 10
+    offset = (page - 1) * por_pagina
 
-    # Construir query base
-    query = 'SELECT * FROM oposiciones WHERE departamento = ?'
+    sql = "SELECT * FROM oposiciones WHERE departamento = ?"
     params = [nombre]
 
-    if texto_busqueda:
-        query += ' AND (identificador LIKE ? OR titulo LIKE ? OR control LIKE ? OR provincia LIKE ?)'
-        busqueda_param = f'%{texto_busqueda}%'
-        params.extend([busqueda_param, busqueda_param, busqueda_param, busqueda_param])
-
-    if provincia_filtro:
-        query += ' AND provincia = ?'
-        params.append(provincia_filtro)
+    if busqueda:
+        like = f"%{busqueda}%"
+        sql += " AND (titulo LIKE ? OR identificador LIKE ? OR control LIKE ?)"
+        params += [like, like, like]
 
     if fecha_desde:
-        fecha_desde_formateada = fecha_desde.replace('-', '')
-        query += ' AND fecha >= ?'
-        params.append(fecha_desde_formateada)
+        sql += " AND fecha >= ?"
+        params.append(fecha_desde.replace("-", ""))
 
     if fecha_hasta:
-        fecha_hasta_formateada = fecha_hasta.replace('-', '')
-        query += ' AND fecha <= ?'
-        params.append(fecha_hasta_formateada)
+        sql += " AND fecha <= ?"
+        params.append(fecha_hasta.replace("-", ""))
 
-    # Contar total de resultados para paginación
-    total_query = 'SELECT COUNT(*) FROM (' + query + ')'
-    total = db.execute(total_query, params).fetchone()[0]
-    total_pages = (total + per_page - 1) // per_page
+    sql += " ORDER BY fecha DESC LIMIT ? OFFSET ?"
+    params += [por_pagina, offset]
 
-    # Añadir LIMIT/OFFSET para paginación
-    query += ' ORDER BY fecha DESC, id DESC LIMIT ? OFFSET ?'
-    params.extend([per_page, offset])
+    rows = db.execute(sql, params).fetchall()
 
-    cur = db.execute(query, params)
-    rows = cur.fetchall()
+    total = db.execute(
+        "SELECT COUNT(*) FROM oposiciones WHERE departamento = ?", (nombre,)
+    ).fetchone()[0]
+    total_pages = (total + por_pagina - 1) // por_pagina
 
-    return render_template('tarjeta.html',
-                           departamento=nombre,
-                           rows=rows,
-                           page=page,
-                           total_pages=total_pages,
-                           busqueda=texto_busqueda,
-                           provincia_filtro=provincia_filtro,
-                           provincias=provincias_disponibles,
-                           fecha_desde=fecha_desde,
-                           fecha_hasta=fecha_hasta,
-                           user=current_user())
+    provincias = db.execute(
+        "SELECT DISTINCT provincia FROM oposiciones WHERE provincia IS NOT NULL ORDER BY provincia"
+    ).fetchall()
+
+    return render_template(
+        "tarjeta.html",
+        departamento=nombre,
+        rows=rows,
+        page=page,
+        total_pages=total_pages,
+        provincias=provincias,
+        busqueda=busqueda,
+        provincia_filtro=provincia,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        hoy=hoy  
+    )
+
 
 
 
