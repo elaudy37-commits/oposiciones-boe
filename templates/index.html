@@ -42,12 +42,20 @@ Incluye botón para actualizar datos del BOE.
       {% endif %}
     {% endwith %}
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2 class="mb-0">Departamentos</h2>
-      <a href="{{ url_for('do_scrape') }}" class="btn btn-primary btn-update">
-        Actualizar datos BOE
-      </a>
-    </div>
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h2 class="mb-0">Departamentos</h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('do_scrape') }}" class="btn btn-primary btn-update">
+      Actualizar datos BOE
+    </a>
+    <a href="https://www.boe.es" target="_blank" class="btn btn-primary btn-update">
+      Ir al BOE
+    </a>
+  </div>
+</div>
+
+
+
 
     <div class="row g-4">
       {% for dep in departamentos %}
