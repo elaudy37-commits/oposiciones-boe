@@ -41,7 +41,24 @@ Mi objetivo fue crear una interfaz clara, usable y visualmente coherente para qu
 - Panel de usuario
 - Interfaz responsive
 
-##  Capturas de pantalla
-*(Aquí añadiremos imágenes cuando quieras)*
+## Instalación y ejecución
 
-##  Instalación y ejecución
+Sigue estos pasos si quieres ejecutar el proyecto en local:
+
+1. Clonar el repositorio:
+git clone https://github.com/elaudy37-commits/oposiciones-boe.git
+
+2. Entrar en la carpeta del proyecto:
+cd oposiciones-boe
+
+3. Crear un entorno virtual:
+python -m venv venv
+
+4. Activar el entorno virtual (Windows):
+venv\Scripts\activate
+
+5. Instalar dependencias:
+pip install -r requirements.txt
+
+6. Ejecutar la aplicación:
+python scraping_BOE.py
